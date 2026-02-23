@@ -115,6 +115,13 @@ export default function ClientsPage() {
   const [email, setEmail] = useState("");
   const [fee, setFee] = useState("");
 
+  // Record payment modal
+  const [payOpen, setPayOpen] = useState(false);
+  const [payClientId, setPayClientId] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState<string>("");
+  const [payDate, setPayDate] = useState<string>(todayISO());
+
+
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"ALL" | "PAID" | "UNPAID">("ALL");
   const [sort, setSort] = useState<"NAME" | "FEE_DESC" | "FEE_ASC">("NAME");
@@ -232,6 +239,25 @@ export default function ClientsPage() {
     const to = encodeURIComponent((c.email || "").trim());
     return `mailto:${to}?subject=${subject}&body=${body}`;
   }
+
+  function openPayModal(c: Client) {
+    setPayClientId(c.id);
+    setPayAmount(String(c.monthlyFee || ""));
+    setPayDate(todayISO());
+    setPayOpen(true);
+  }
+
+  function confirmPay() {
+    if (!payClientId) return;
+    const amt = Number(payAmount);
+    if (!Number.isFinite(amt) || amt <= 0) return alert("Enter a valid amount.");
+
+    markPaid(payClientId);
+
+    setPayOpen(false);
+    setPayClientId(null);
+  }
+
 
   async function copyAllReminders() {
     if (unpaidClients.length === 0) return alert("No unpaid clients.");
@@ -380,7 +406,7 @@ export default function ClientsPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       <span className={`pill ${isPaid ? "pill-paid" : "pill-unpaid"}`}>{c.status}</span>
 
-                      <button className="btn btn-primary" type="button" onClick={() => markPaid(c.id)} disabled={isPaid} style={{ opacity: isPaid ? 0.55 : 1 }}>
+                      <button className="btn btn-primary" type="button" onClick={() => openPayModal(c)} disabled={isPaid} style={{ opacity: isPaid ? 0.55 : 1 }}>
                         Record payment
                       </button>
 
