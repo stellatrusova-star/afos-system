@@ -170,7 +170,6 @@ export default function ClientsPage() {
 
   const totals = useMemo(() => {
 
-  const lastPaid = useMemo(() => lastPaidMap(payments), [payments]);
 
     const total = clients.reduce((s, c) => s + (Number(c.monthlyFee) || 0), 0);
     const paid = clients.filter((c) => c.status === "PAID").reduce((s, c) => s + (Number(c.monthlyFee) || 0), 0);
