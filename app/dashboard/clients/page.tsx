@@ -463,7 +463,7 @@ export default function ClientsPage() {
                     <div style={{ minWidth: 0 }}>
                       <div className="item-title">{c.name}</div>
                       <div className="item-sub">
-                        ₱ {Number(c.monthlyFee).toLocaleString()} / month {c.email?.trim() ? `• ${c.email}` : ""}
+                        ₱ {Number(c.monthlyFee).toLocaleString()} / month {c.email?.trim() ? `• ${c.email}` : ""}{c.status === "PAID" && lastPaid.get(c.id) ? ` • Last paid: ${lastPaid.get(c.id)}` : ""}
                       </div>
                     </div>
 
