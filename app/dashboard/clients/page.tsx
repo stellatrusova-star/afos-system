@@ -167,6 +167,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     const refresh = () => setPayments(loadPayments());
+    refresh();
     window.addEventListener("afos_payments_updated", refresh);
     return () => window.removeEventListener("afos_payments_updated", refresh);
   }, []);
