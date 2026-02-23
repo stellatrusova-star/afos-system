@@ -429,6 +429,55 @@ export default function ClientsPage() {
           Note: “Record payment” is the safe action. It writes to Payments history and marks the client as PAID.
         </div>
       </div>
+
+      {payOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 50,
+          }}
+          onClick={() => setPayOpen(false)}
+        >
+          <div className="card card-pad" style={{ width: "min(520px, 100%)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="row">
+              <div>
+                <div className="h2">Record payment</div>
+                <div className="sub">Confirm details before marking as PAID.</div>
+              </div>
+              <button className="btn" type="button" onClick={() => setPayOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div className="kpi-label">Amount</div>
+                <input className="input" inputMode="numeric" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+              </div>
+              <div>
+                <div className="kpi-label">Date</div>
+                <input className="input" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button className="btn" type="button" onClick={() => setPayOpen(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="button" onClick={confirmPay}>
+                Confirm payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
