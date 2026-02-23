@@ -105,9 +105,9 @@ async function copyText(text: string) {
 
 export default function ClientsPage() {
   const defaultClients: Client[] = [
-    { id: "a", name: "Client A", email: "", monthlyFee: 5000, status: "UNPAID" },
-    { id: "b", name: "Client B", email: "", monthlyFee: 8000, status: "PAID" },
-    { id: "c", name: "Client C", email: "", monthlyFee: 6500, status: "UNPAID" },
+    { id: "a", name: "Client A", email: "", monthlyFee: 5000, status: "UNPAID" as const },
+    { id: "b", name: "Client B", email: "", monthlyFee: 8000, status: "PAID" as const },
+    { id: "c", name: "Client C", email: "", monthlyFee: 6500, status: "UNPAID" as const },
   ];
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -174,7 +174,7 @@ export default function ClientsPage() {
       name: name.trim(),
       email: email.trim(),
       monthlyFee,
-      status: "UNPAID",
+      status: "UNPAID" as const,
     };
 
     setClients((prev) => {
@@ -212,7 +212,7 @@ export default function ClientsPage() {
 
   function markUnpaid(id: string) {
     setClients((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, status: "UNPAID" } : c));
+      const next = prev.map((c) => (c.id === id ? { ...c, status: "UNPAID" as const } : c));
       saveClients(next);
       return next;
     });
@@ -388,7 +388,7 @@ export default function ClientsPage() {
                         Mark UNPAID
                       </button>
 
-                      <button className="btn btn-danger" type="button" onClick={() => removeClient(c.id)}>
+                      <button className="btn" type="button" onClick={() => removeClient(c.id)}>
                         Remove
                       </button>
                     </div>
