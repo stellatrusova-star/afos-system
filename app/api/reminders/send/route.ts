@@ -53,6 +53,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Reminders not configured (missing DATABASE_URL)" }, { status: 501 });
   }
 
+  try {
   // period selection (explicit via query or defaults to current)
   const { searchParams } = new URL(req.url);
   const now = new Date();
@@ -108,4 +109,12 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ok: true, year, month, sent });
+  } catch (e: any) {
+    console.error(e);
+    return NextResponse.json(
+      { ok: false, name: e?.name, code: e?.code, message: String(e?.message || e) },
+      { status: 500 }
+    );
+  }
 }
+
