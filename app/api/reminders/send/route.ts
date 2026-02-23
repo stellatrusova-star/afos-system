@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 function buildMessage(name: string, amount: number) {
   const d = new Date().toISOString().slice(0, 10);
@@ -16,11 +14,16 @@ Thank you!`;
 }
 
 export async function POST(req: Request) {
+  // auth gate
   const auth = req.headers.get("authorization");
+  if (!process.env.REMINDERS_SECRET) {
+    return NextResponse.json({ error: "Reminders not configured (missing REMINDERS_SECRET)" }, { status: 501 });
+  }
   if (auth !== `Bearer ${process.env.REMINDERS_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // env gate (email)
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || "465");
   const user = process.env.SMTP_USER;
@@ -28,7 +31,12 @@ export async function POST(req: Request) {
   const from = process.env.SMTP_FROM || user;
 
   if (!host || !user || !pass) {
-    return NextResponse.json({ error: "Missing SMTP env vars" }, { status: 500 });
+    return NextResponse.json({ error: "Reminders not configured (missing SMTP env vars)" }, { status: 501 });
+  }
+
+  // env gate (db)
+  if (!process.env.PG_DATABASE_URL) {
+    return NextResponse.json({ error: "Reminders not configured (missing PG_DATABASE_URL)" }, { status: 501 });
   }
 
   const transporter = nodemailer.createTransport({
@@ -38,17 +46,17 @@ export async function POST(req: Request) {
     auth: { user, pass },
   });
 
+  // NOTE: Prisma model is `Client` in schema, so query `client`
   const unpaid = await prisma.client.findMany({
     where: { status: "UNPAID" },
-    select: { name: true, email: true, monthlyFee: true },
+    select: { name: true, monthlyFee: true },
   });
 
   let sent = 0;
-
   for (const c of unpaid) {
     await transporter.sendMail({
       from,
-      to: c.email,
+      to: (process.env.REMINDERS_TO || user),
       subject: "Payment reminder",
       text: buildMessage(c.name, c.monthlyFee),
     });
