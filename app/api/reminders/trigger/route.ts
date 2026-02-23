@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { POST as sendReminders } from "@/app/api/reminders/send/route";
 
 export async function POST(req: Request) {
   try {
@@ -26,18 +27,22 @@ export async function POST(req: Request) {
 
     const { year, month } = await req.json();
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/reminders/send?year=${year}&month=${month}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.REMINDERS_SECRET}`,
-        },
-      }
-    );
+    const secret = process.env.REMINDERS_SECRET;
+    if (!secret) {
+      return NextResponse.json({ error: "Reminders not configured (missing REMINDERS_SECRET)" }, { status: 501 });
+    }
 
-    const data = await res.json();
-    return NextResponse.json(data);
+    const url = new URL(req.url);
+    url.pathname = "/api/reminders/send";
+    url.searchParams.set("year", String(year));
+    url.searchParams.set("month", String(month));
+
+    const innerReq = new Request(url.toString(), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+
+    return await sendReminders(innerReq);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to trigger reminders" }, { status: 500 });
