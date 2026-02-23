@@ -6,7 +6,7 @@ function buildMessage(name: string, amount: number) {
   const d = new Date().toISOString().slice(0, 10);
   return `Hi ${name},
 
-Just a quick reminder that your monthly payment of ₱ ${amount.toLocaleString()} is still marked as UNPAID as of ${d}.
+Just a quick reminder that your monthly payment of ₱ ${amount.toLocaleString()} is due as of ${d}.
 
 If you’ve already paid, please ignore this message and let us know so we can update our records.
 
@@ -14,16 +14,16 @@ Thank you!`;
 }
 
 export async function POST(req: Request) {
-  // auth gate
   const auth = req.headers.get("authorization");
+
   if (!process.env.REMINDERS_SECRET) {
     return NextResponse.json({ error: "Reminders not configured (missing REMINDERS_SECRET)" }, { status: 501 });
   }
+
   if (auth !== `Bearer ${process.env.REMINDERS_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // env gate (email)
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || "465");
   const user = process.env.SMTP_USER;
@@ -34,7 +34,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Reminders not configured (missing SMTP env vars)" }, { status: 501 });
   }
 
-  // env gate (db)
   if (!process.env.PG_DATABASE_URL) {
     return NextResponse.json({ error: "Reminders not configured (missing PG_DATABASE_URL)" }, { status: 501 });
   }
@@ -46,17 +45,16 @@ export async function POST(req: Request) {
     auth: { user, pass },
   });
 
-  // NOTE: Prisma model is `Client` in schema, so query `client`
-  const unpaid = await prisma.client.findMany({
-    where: { status: "UNPAID" },
+  const clients = await prisma.client.findMany({
     select: { name: true, monthlyFee: true },
   });
 
   let sent = 0;
-  for (const c of unpaid) {
+
+  for (const c of clients) {
     await transporter.sendMail({
       from,
-      to: (process.env.REMINDERS_TO || user),
+      to: process.env.REMINDERS_TO || user,
       subject: "Payment reminder",
       text: buildMessage(c.name, c.monthlyFee),
     });

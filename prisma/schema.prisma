@@ -3,15 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("PG_DATABASE_URL")
 }
 
 model Client {
   id         String   @id @default(cuid())
   name       String
-  email      String   @unique
+  email      String?  @unique
   monthlyFee Int
-  status     String   @default("UNPAID") // "PAID" or "UNPAID"
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -24,4 +24,13 @@ model Payment {
   client    Client   @relation(fields: [clientId], references: [id])
   amount    Int
   paidAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  meta       Json?
+  createdAt  DateTime @default(now())
 }
