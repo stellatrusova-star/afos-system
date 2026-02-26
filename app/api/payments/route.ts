@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+function logEvent(data: Record<string, unknown>) {
+  console.log(JSON.stringify({ ts: new Date().toISOString(), ...data }));
+}
+
 async function getOrCreatePeriod(year: number, month: number) {
   let period = await prisma.billingPeriod.findUnique({
     where: { year_month: { year, month } },
@@ -12,6 +16,17 @@ async function getOrCreatePeriod(year: number, month: number) {
     });
   }
 
+  return period;
+}
+
+async function assertPeriodOpen(periodId: string) {
+  const period = await prisma.billingPeriod.findUnique({ where: { id: periodId } });
+  if (!period) throw new Error("BillingPeriod not found");
+  if (period.isClosed) {
+    const err: any = new Error("BillingPeriod is closed");
+    err.code = "BILLING_PERIOD_CLOSED";
+    throw err;
+  }
   return period;
 }
 
@@ -30,6 +45,7 @@ export async function GET(req: Request) {
     const payments = await prisma.payment.findMany({
       where: {
         paidAt: { gte: start, lt: end },
+        deletedAt: null,
       },
       orderBy: { paidAt: "desc" },
       include: {
@@ -37,9 +53,10 @@ export async function GET(req: Request) {
       },
     });
 
+    logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "ok", year, month, count: payments.length });
     return NextResponse.json({ year, month, payments });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "err", message: String(err?.message || err) });
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 });
   }
 }
@@ -71,6 +88,7 @@ export async function POST(req: Request) {
     }
 
     const period = await getOrCreatePeriod(year, month);
+    await assertPeriodOpen(period.id);
 
     const paidAt = new Date(
       Date.UTC(
@@ -82,6 +100,40 @@ export async function POST(req: Request) {
         now.getUTCSeconds()
       )
     );
+
+    // Duplicate payment guard (same client + same amount + same derived billing month, within 3 minutes)
+    const windowMs = 3 * 60 * 1000;
+    const since = new Date(paidAt.getTime() - windowMs);
+
+    const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+    const end = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+
+    const dup = await prisma.payment.findFirst({
+      where: {
+        clientId,
+        amount: Math.round(amount),
+        deletedAt: null,
+        paidAt: { gte: since },
+        // ensure same derived month
+        AND: [{ paidAt: { gte: start } }, { paidAt: { lt: end } }],
+      },
+      orderBy: { paidAt: "desc" },
+    });
+
+    if (dup) {
+      logEvent({
+        event: "PAYMENT_CREATE",
+        route: "/api/payments",
+        result: "err",
+        reason: "duplicate_guard",
+        clientId,
+        amount: Math.round(amount),
+        year,
+        month,
+        dupId: dup.id,
+      });
+      return NextResponse.json({ error: "Duplicate payment blocked" }, { status: 409 });
+    }
 
     const payment = await prisma.payment.create({
       data: { clientId, amount: Math.round(amount), paidAt },
@@ -107,13 +159,19 @@ export async function POST(req: Request) {
         entityType: "Payment",
         entityId: payment.id,
         action: "CREATE",
-        meta: { clientId, amount, year, month },
+        meta: { clientId, amount: Math.round(amount), year, month },
       },
     });
 
+    logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "ok", paymentId: payment.id, clientId, year, month });
     return NextResponse.json({ ok: true, payment }, { status: 201 });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    const code = err?.code;
+    if (code === "BILLING_PERIOD_CLOSED") {
+      logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", reason: "period_closed" });
+      return NextResponse.json({ error: "Billing period is closed" }, { status: 409 });
+    }
+    logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", message: String(err?.message || err) });
     return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
   }
 }
@@ -122,6 +180,7 @@ export async function DELETE(req: Request) {
   try {
     const body = await req.json();
     const paymentId = body?.paymentId;
+    const reason = typeof body?.reason === "string" ? body.reason : null;
 
     if (!paymentId || typeof paymentId !== "string") {
       return NextResponse.json({ error: "Missing or invalid paymentId" }, { status: 400 });
@@ -129,9 +188,10 @@ export async function DELETE(req: Request) {
 
     const existing = await prisma.payment.findUnique({
       where: { id: paymentId },
+      include: { client: { select: { id: true } } },
     });
 
-    if (!existing) {
+    if (!existing || existing.deletedAt) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
@@ -140,18 +200,48 @@ export async function DELETE(req: Request) {
     const month = paidAt.getUTCMonth() + 1;
 
     const period = await getOrCreatePeriod(year, month);
+    await assertPeriodOpen(period.id);
 
-    await prisma.payment.delete({
-      where: { id: paymentId },
+    await prisma.$transaction(async (tx) => {
+      // snapshot pre-delete
+      await tx.auditLog.create({
+        data: {
+          entityType: "Payment",
+          entityId: paymentId,
+          action: "SOFT_DELETE",
+          meta: {
+            snapshot: {
+              id: existing.id,
+              clientId: existing.clientId,
+              amount: existing.amount,
+              paidAt: existing.paidAt,
+              deletedAt: null,
+            },
+            year,
+            month,
+            reason,
+          },
+        },
+      });
+
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          deletedAt: new Date(),
+          deleteReason: reason,
+          deletedById: null,
+        },
+      });
     });
 
-    // If no remaining payments for this client in that month, revert status
+    // If no remaining (non-deleted) payments for this client in that month, revert status
     const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
     const end = new Date(Date.UTC(year, month, 1, 0, 0, 0));
 
     const remaining = await prisma.payment.count({
       where: {
         clientId: existing.clientId,
+        deletedAt: null,
         paidAt: { gte: start, lt: end },
       },
     });
@@ -177,14 +267,20 @@ export async function DELETE(req: Request) {
       data: {
         entityType: "Payment",
         entityId: paymentId,
-        action: "DELETE",
+        action: "DELETE_REQUEST",
         meta: { clientId: existing.clientId, amount: existing.amount, year, month, remaining },
       },
     });
 
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
+    logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "ok", paymentId, year, month, remaining });
+    return NextResponse.json({ ok: true, remaining });
+  } catch (err: any) {
+    const code = err?.code;
+    if (code === "BILLING_PERIOD_CLOSED") {
+      logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "err", reason: "period_closed" });
+      return NextResponse.json({ error: "Billing period is closed" }, { status: 409 });
+    }
+    logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "err", message: String(err?.message || err) });
     return NextResponse.json({ error: "Failed to delete payment" }, { status: 500 });
   }
 }

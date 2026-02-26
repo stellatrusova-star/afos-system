@@ -44,3 +44,4 @@ next-env.d.ts
 
 # local scripts
 scripts/
+.env*.local

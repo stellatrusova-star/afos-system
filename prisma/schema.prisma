@@ -25,6 +25,14 @@ model Payment {
   client    Client   @relation(fields: [clientId], references: [id])
   amount    Int
   paidAt    DateTime @default(now())
+
+  // v3.12 soft-delete
+  deletedAt    DateTime?
+  deletedById  String?
+  deleteReason String?
+
+  @@index([clientId, amount, paidAt])
+  @@index([clientId, deletedAt])
 }
 
 model BillingPeriod {
@@ -32,6 +40,11 @@ model BillingPeriod {
   year      Int
   month     Int
   createdAt DateTime @default(now())
+
+  // v3.12 locking
+  isClosed   Boolean  @default(false)
+  closedAt   DateTime?
+  closedById String?
 
   clientStatuses ClientStatusByMonth[]
 
