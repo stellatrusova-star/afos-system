@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-function logEvent(data: Record<string, unknown>) {
-  console.log(JSON.stringify({ ts: new Date().toISOString(), ...data }));
-}
-
 async function getOrCreatePeriod(year: number, month: number) {
   let period = await prisma.billingPeriod.findUnique({
     where: { year_month: { year, month } },
@@ -27,8 +23,16 @@ export async function GET(req: Request) {
     const year = Number(searchParams.get("year") ?? now.getFullYear());
     const month = Number(searchParams.get("month") ?? now.getMonth() + 1);
 
+    if (!Number.isInteger(year) || year < 2000 || year > 3000) {
+      return NextResponse.json({ error: "Invalid year" }, { status: 400 });
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return NextResponse.json({ error: "Invalid month" }, { status: 400 });
+    }
+
     const period = await getOrCreatePeriod(year, month);
 
+    // Fetch clients once
     const clients = await prisma.client.findMany({
       include: {
         monthlyStatuses: {
@@ -38,47 +42,51 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    // If the period is closed, do NOT mutate status rows during reads.
-    if (!period.isClosed) {
-      for (const c of clients) {
-        if (c.monthlyStatuses.length === 0) {
-          await prisma.clientStatusByMonth.create({
-            data: {
-              clientId: c.id,
-              billingPeriodId: period.id,
-            },
-          });
-        }
-      }
+    // Create missing statuses in a safe way (idempotent via @@unique)
+    const missing = clients.filter((c) => c.monthlyStatuses.length === 0);
+
+    if (missing.length > 0) {
+      await prisma.clientStatusByMonth.createMany({
+        data: missing.map((c) => ({
+          clientId: c.id,
+          billingPeriodId: period.id,
+          status: "UNPAID",
+        })),
+        skipDuplicates: true,
+      });
     }
 
-    const refreshed = await prisma.client.findMany({
-      include: {
-        monthlyStatuses: {
-          where: { billingPeriodId: period.id },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+    // Re-fetch statuses only (cheap), not full clients twice
+    const statuses = await prisma.clientStatusByMonth.findMany({
+      where: { billingPeriodId: period.id },
+      select: { clientId: true, status: true },
     });
 
-    logEvent({ event: "CLIENTS_GET", route: "/api/clients", result: "ok", year, month, count: refreshed.length, isClosed: period.isClosed });
+    const statusMap = new Map(statuses.map((s) => [s.clientId, s.status]));
 
     return NextResponse.json({
       year,
       month,
-      isClosed: period.isClosed,
-      clients: refreshed.map((c) => ({
+      clients: clients.map((c) => ({
         id: c.id,
         name: c.name,
         email: c.email,
         monthlyFee: c.monthlyFee,
         createdAt: c.createdAt,
-        status: c.monthlyStatuses[0]?.status ?? "UNPAID",
+        status: statusMap.get(c.id) ?? "UNPAID",
       })),
     });
   } catch (err: any) {
-    logEvent({ event: "CLIENTS_GET", route: "/api/clients", result: "err", message: String(err?.message || err) });
-    return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
+    console.error(err);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch clients",
+        name: err?.name,
+        code: err?.code,
+        message: String(err?.message || err),
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -98,10 +106,17 @@ export async function POST(req: Request) {
       },
     });
 
-    logEvent({ event: "CLIENT_CREATE", route: "/api/clients", result: "ok", clientId: created.id });
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
-    logEvent({ event: "CLIENT_CREATE", route: "/api/clients", result: "err", message: String(err?.message || err) });
-    return NextResponse.json({ error: "Failed to create client" }, { status: 500 });
+    console.error(err);
+    return NextResponse.json(
+      {
+        error: "Failed to create client",
+        name: err?.name,
+        code: err?.code,
+        message: String(err?.message || err),
+      },
+      { status: 500 }
+    );
   }
 }
