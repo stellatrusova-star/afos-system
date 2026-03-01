@@ -51,3 +51,4 @@ dev.log
 !scripts/make-admin.mjs
 
 !scripts/seed-test-fixtures.mjs
+.env.test
