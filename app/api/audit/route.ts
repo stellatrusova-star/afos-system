@@ -1,20 +1,18 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
+import { Role } from "@prisma/client";
 
-export async function GET() {
-  try {
-    await requireSession();
-    const logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+export async function GET(_req: Request) {
+  const auth = await requireUser({ roles: [Role.ADMIN] });
+  if (auth.error) return auth.error;
 
-    return NextResponse.json(logs);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Failed to fetch audit logs" }, { status: 500 });
-  }
+  const logs = await prisma.auditLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  return NextResponse.json({ ok: true, logs }, { status: 200 });
 }
