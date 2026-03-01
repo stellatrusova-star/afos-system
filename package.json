@@ -15,7 +15,10 @@
     "db:which": "node -e \"require('dotenv').config({path:'.env'}); if(!process.env.DATABASE_URL) { console.error('DATABASE_URL missing'); process.exit(1);} const u=new URL(process.env.DATABASE_URL); console.log(u.host+' / '+u.pathname.replace('/',''));\"",
     "db:which:neon": "DATABASE_URL=$(sed -n 's/^DATABASE_URL=\"\\(.*\\)\"$/\\1/p' .env.local.bak | head -n 1) node -e \"const u=new URL(process.env.DATABASE_URL); console.log(u.host+' / '+u.pathname.replace('/',''));\"",
     "prisma:regen": "npx prisma format && rm -rf node_modules/.prisma && npx prisma generate --schema=prisma/schema.prisma",
-    "make-admin": "node -r dotenv/config scripts/make-admin.mjs"
+    "make-admin": "node -r dotenv/config scripts/make-admin.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "pnpm exec prisma migrate reset --force && node scripts/seed-test-fixtures.mjs && concurrently -k -s first -n DEV,TEST \"pnpm run dev\" \"pnpm exec wait-on http://127.0.0.1:3000/api/health && pnpm exec vitest run --environment node tests/integration/closed-period.test.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
@@ -37,14 +40,20 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.0.18",
+    "wait-on": "^9.0.4"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",
     "seed": "node -r dotenv/config scripts/make-admin.mjs"
-  }
+  },
+  "dev": "NEXT_DISABLE_TURBOPACK=1 next dev -p 3000"
 }
