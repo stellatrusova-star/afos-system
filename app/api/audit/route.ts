@@ -1,8 +1,12 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
+    await requireSession();
     const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,

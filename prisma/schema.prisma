@@ -20,11 +20,11 @@ model Client {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id])
-  amount    Int
-  paidAt    DateTime @default(now())
+  id       String   @id @default(cuid())
+  clientId String
+  client   Client   @relation(fields: [clientId], references: [id])
+  amount   Int
+  paidAt   DateTime @default(now())
 
   // v3.12 soft-delete
   deletedAt    DateTime?
@@ -42,7 +42,7 @@ model BillingPeriod {
   createdAt DateTime @default(now())
 
   // v3.12 locking
-  isClosed   Boolean  @default(false)
+  isClosed   Boolean   @default(false)
   closedAt   DateTime?
   closedById String?
 
@@ -52,10 +52,10 @@ model BillingPeriod {
 }
 
 model ClientStatusByMonth {
-  id              String   @id @default(cuid())
+  id              String @id @default(cuid())
   clientId        String
   billingPeriodId String
-  status          String   @default("UNPAID")
+  status          String @default("UNPAID")
 
   client        Client        @relation(fields: [clientId], references: [id])
   billingPeriod BillingPeriod @relation(fields: [billingPeriodId], references: [id])
@@ -65,6 +65,7 @@ model ClientStatusByMonth {
 
 model AuditLog {
   id         String   @id @default(cuid())
+  userId     String?
   entityType String
   entityId   String
   action     String

@@ -1,4 +1,7 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 async function getOrCreatePeriod(year: number, month: number) {
@@ -17,6 +20,7 @@ async function getOrCreatePeriod(year: number, month: number) {
 
 export async function GET(req: Request) {
   try {
+    await requireSession();
     const { searchParams } = new URL(req.url);
 
     const now = new Date();
@@ -76,14 +80,29 @@ export async function GET(req: Request) {
         status: statusMap.get(c.id) ?? "UNPAID",
       })),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const status =
+      err && typeof err === "object" && "status" in err
+        ? (err as { status?: unknown }).status
+        : undefined;
+
+    if (status === 401) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     console.error(err);
+
+    const meta =
+      err && typeof err === "object"
+        ? {
+            name: "name" in err ? String((err as { name?: unknown }).name) : undefined,
+            code: "code" in err ? String((err as { code?: unknown }).code) : undefined,
+            message: "message" in err ? String((err as { message?: unknown }).message) : String(err),
+          }
+        : { message: String(err) };
+
     return NextResponse.json(
       {
         error: "Failed to fetch clients",
-        name: err?.name,
-        code: err?.code,
-        message: String(err?.message || err),
+        ...meta,
       },
       { status: 500 }
     );
@@ -92,6 +111,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    await requireSession();
     const body = await req.json();
 
     if (!body?.name) {
@@ -107,14 +127,22 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(created, { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
+
+    const meta =
+      err && typeof err === "object"
+        ? {
+            name: "name" in err ? String((err as { name?: unknown }).name) : undefined,
+            code: "code" in err ? String((err as { code?: unknown }).code) : undefined,
+            message: "message" in err ? String((err as { message?: unknown }).message) : String(err),
+          }
+        : { message: String(err) };
+
     return NextResponse.json(
       {
         error: "Failed to create client",
-        name: err?.name,
-        code: err?.code,
-        message: String(err?.message || err),
+        ...meta,
       },
       { status: 500 }
     );

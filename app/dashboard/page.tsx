@@ -101,7 +101,14 @@ export default function DashboardPage() {
           </button>
         </Link>
 
-        <Link href="/dashboard/audit">
+        
+        <Link href="/dashboard/billing">
+          <button style={{ padding: 12, borderRadius: 10, border: "1px solid #333" }}>
+            Billing
+          </button>
+        </Link>
+
+<Link href="/dashboard/audit">
           <button style={{ padding: 12, borderRadius: 10, border: "1px solid #333" }}>
             Audit Log
           </button>

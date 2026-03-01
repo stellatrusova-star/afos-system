@@ -39,53 +39,88 @@ export default function ClientsPage() {
   }, [now]);
 
   async function loadClients(y: number, m: number) {
-    setLoading(true);
-    const res = await fetch(`/api/clients?year=${y}&month=${m}`);
-    const data = (await res.json()) as ClientsResponse;
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/clients?year=${y}&month=${m}`, {
+          credentials: "include",
+        });
 
-    setYear(Number(data?.year ?? y));
-    setMonth(Number(data?.month ?? m));
-    setClients(Array.isArray(data?.clients) ? data.clients : []);
-    setLoading(false);
-  }
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
 
-  async function createClient(e: React.FormEvent) {
-    e.preventDefault();
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          console.error("[ClientsPage] loadClients failed", res.status, text);
+          setClients([]);
+          return;
+        }
 
-    await fetch("/api/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        monthlyFee: Number(monthlyFee),
-      }),
-    });
+        const data = (await res.json()) as ClientsResponse;
 
-    setName("");
-    setMonthlyFee("");
-    loadClients(year, month);
-  }
+        const nextYear = Number((data as any)?.year ?? y);
+        const nextMonth = Number((data as any)?.month ?? m);
 
-  async function recordPayment(clientId: string, amount: number, clientName: string) {
-    const confirmed = window.confirm(`Record payment of ₱${amount.toLocaleString()} for ${clientName}?`);
-    if (!confirmed) return;
+        if (nextYear !== y) setYear(nextYear);
+        if (nextMonth !== m) setMonth(nextMonth);
 
-    await fetch("/api/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, amount, year, month }),
-    });
+        setClients(Array.isArray((data as any)?.clients) ? (data as any).clients : []);
+      } catch (err) {
+        console.error("[ClientsPage] loadClients exception", err);
+        setClients([]);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    loadClients(year, month);
-  }
+  
 
-  useEffect(() => {
-    loadClients(year, month);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    async function createClient(e: React.FormEvent) {
+      e.preventDefault();
+
+      await fetch("/api/clients", {
+        credentials: "include",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          monthlyFee: Number(monthlyFee),
+        }),
+      });
+
+      setName("");
+      setMonthlyFee("");
+      loadClients(year, month);
+    }
+
+
+    async function recordPayment(clientId: string, amount: number, clientName: string) {
+      const confirmed = window.confirm(`Record payment of ₱${amount.toLocaleString()} for ${clientName}?`);
+      if (!confirmed) return;
+
+      await fetch("/api/payments", {
+        credentials: "include",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, amount, year, month }),
+      });
+
+      loadClients(year, month);
+    }
+
+    useEffect(() => {
+      loadClients(year, month);
+
+      const onVis = () => {
+        if (document.visibilityState === "visible") loadClients(year, month);
+      };
+
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    }, [year, month]);
 
   if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
-
   return (
     <main style={{ padding: 40 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
@@ -95,47 +130,44 @@ export default function ClientsPage() {
             Viewing: {monthLabel(month)} {year}
           </div>
         </div>
-
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <select
-            value={year}
-            onChange={(e) => {
-              const y = Number(e.target.value);
-              setYear(y);
-              loadClients(y, month);
-            }}
-            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff" }}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={month}
-            onChange={(e) => {
-              const m = Number(e.target.value);
-              setMonth(m);
-              loadClients(year, m);
-            }}
-            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff" }}
-          >
-            {Array.from({ length: 12 }).map((_, i) => {
-              const m = i + 1;
-              return (
-                <option key={m} value={m}>
-                  {monthLabel(m)}
+            <select
+              value={year}
+              onChange={(e) => {
+                const y = Number(e.target.value);
+                setYear(y);
+              }}
+              style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff" }}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
                 </option>
-              );
-            })}
-          </select>
+              ))}
+            </select>
 
-          <Link href="/dashboard" style={{ textDecoration: "none" }}>
-            <span style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}>Back</span>
-          </Link>
-        </div>
+            <select
+              value={month}
+              onChange={(e) => {
+                const m = Number(e.target.value);
+                setMonth(m);
+              }}
+              style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "#fff" }}
+            >
+              {Array.from({ length: 12 }).map((_, i) => {
+                const m = i + 1;
+                return (
+                  <option key={m} value={m}>
+                    {monthLabel(m)}
+                  </option>
+                );
+              })}
+            </select>
+
+            <Link href="/dashboard" style={{ textDecoration: "none" }}>
+              <span style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd" }}>Back</span>
+            </Link>
+          </div>
       </div>
 
       <form onSubmit={createClient} style={{ marginTop: 20 }}>

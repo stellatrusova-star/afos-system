@@ -1,5 +1,9 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireOpenPeriod } from "@/lib/guards/requireOpenPeriod";
 
 function logEvent(data: Record<string, unknown>) {
   console.log(JSON.stringify({ ts: new Date().toISOString(), ...data }));
@@ -23,7 +27,7 @@ async function assertPeriodOpen(periodId: string) {
   const period = await prisma.billingPeriod.findUnique({ where: { id: periodId } });
   if (!period) throw new Error("BillingPeriod not found");
   if (period.isClosed) {
-    const err: any = new Error("BillingPeriod is closed");
+    const err = new Error("BillingPeriod is closed") as Error & { code?: string };
     err.code = "BILLING_PERIOD_CLOSED";
     throw err;
   }
@@ -32,12 +36,13 @@ async function assertPeriodOpen(periodId: string) {
 
 export async function GET(req: Request) {
   try {
+    await requireSession();
     const { searchParams } = new URL(req.url);
     const now = new Date();
     const year = Number(searchParams.get("year") ?? now.getFullYear());
     const month = Number(searchParams.get("month") ?? now.getMonth() + 1);
 
-    await getOrCreatePeriod(year, month);
+    const period = await getOrCreatePeriod(year, month);
 
     const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
     const end = new Date(Date.UTC(year, month, 1, 0, 0, 0));
@@ -54,15 +59,21 @@ export async function GET(req: Request) {
     });
 
     logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "ok", year, month, count: payments.length });
-    return NextResponse.json({ year, month, payments });
-  } catch (err: any) {
-    logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "err", message: String(err?.message || err) });
+    return NextResponse.json({ year, month, isClosed: period.isClosed, periodId: period.id, payments });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "err", message: msg });
+
+    if (/unauthorized|no session|invalid session|auth/i.test(msg)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.json({ error: "Failed to fetch payments" }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
-  try {
+export async function POST(req: Request) {try {
+    const { userId } = await requireSession();
     const body = await req.json();
     const clientId = body?.clientId;
     const amount = body?.amount;
@@ -73,6 +84,11 @@ export async function POST(req: Request) {
 
     if (!clientId || typeof clientId !== "string") {
       return NextResponse.json({ error: "Missing or invalid clientId" }, { status: 400 });
+    }
+
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
     if (typeof amount !== "number" || amount <= 0) {
@@ -156,6 +172,7 @@ export async function POST(req: Request) {
 
     await prisma.auditLog.create({
       data: {
+        userId,
         entityType: "Payment",
         entityId: payment.id,
         action: "CREATE",
@@ -165,19 +182,27 @@ export async function POST(req: Request) {
 
     logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "ok", paymentId: payment.id, clientId, year, month });
     return NextResponse.json({ ok: true, payment }, { status: 201 });
-  } catch (err: any) {
-    const code = err?.code;
+  } catch (err: unknown) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? (err as { code?: unknown }).code
+        : undefined;
     if (code === "BILLING_PERIOD_CLOSED") {
       logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", reason: "period_closed" });
       return NextResponse.json({ error: "Billing period is closed" }, { status: 409 });
     }
-    logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", message: String(err?.message || err) });
+    if (code === "P2003") {
+      // Foreign key constraint (e.g., clientId doesn't exist)
+      logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", reason: "invalid_clientId" });
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+    logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "err", message: (err instanceof Error ? err.message : String(err)) });
     return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request) {
-  try {
+export async function DELETE(req: Request) {try {
+    const { userId } = await requireSession();
     const body = await req.json();
     const paymentId = body?.paymentId;
     const reason = typeof body?.reason === "string" ? body.reason : null;
@@ -206,6 +231,7 @@ export async function DELETE(req: Request) {
       // snapshot pre-delete
       await tx.auditLog.create({
         data: {
+          userId,
           entityType: "Payment",
           entityId: paymentId,
           action: "SOFT_DELETE",
@@ -229,7 +255,7 @@ export async function DELETE(req: Request) {
         data: {
           deletedAt: new Date(),
           deleteReason: reason,
-          deletedById: null,
+          deletedById: userId,
         },
       });
     });
@@ -265,6 +291,7 @@ export async function DELETE(req: Request) {
 
     await prisma.auditLog.create({
       data: {
+        userId,
         entityType: "Payment",
         entityId: paymentId,
         action: "DELETE_REQUEST",
@@ -274,13 +301,16 @@ export async function DELETE(req: Request) {
 
     logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "ok", paymentId, year, month, remaining });
     return NextResponse.json({ ok: true, remaining });
-  } catch (err: any) {
-    const code = err?.code;
+  } catch (err: unknown) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? (err as { code?: unknown }).code
+        : undefined;
     if (code === "BILLING_PERIOD_CLOSED") {
       logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "err", reason: "period_closed" });
       return NextResponse.json({ error: "Billing period is closed" }, { status: 409 });
     }
-    logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "err", message: String(err?.message || err) });
+    logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "err", message: (err instanceof Error ? err.message : String(err)) });
     return NextResponse.json({ error: "Failed to delete payment" }, { status: 500 });
   }
 }

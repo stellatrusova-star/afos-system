@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
@@ -109,10 +111,10 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ ok: true, year, month, sent });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e);
     return NextResponse.json(
-      { ok: false, name: e?.name, code: e?.code, message: String(e?.message || e) },
+      { ok: false, name: (e instanceof Error ? e.name : undefined), code: (e && typeof e === "object" && "code" in e ? (e as { code?: unknown }).code : undefined), message: (e instanceof Error ? e.message : String(e)) },
       { status: 500 }
     );
   }

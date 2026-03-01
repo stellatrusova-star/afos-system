@@ -3,20 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_DISABLE_TURBOPACK=1 next dev -p 3000",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "verify": "rm -rf .next && next build",
     "dev:stable": "NEXT_DISABLE_TURBOPACK=1 next dev",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "dev:neon": "echo \"USING NEON DB\" && DATABASE_URL=$(sed -n 's/^DATABASE_URL=\"\\\\(.*\\\\)\"$/\\\\1/p' .env.local.bak | head -n 1) next dev -p 3000 -H 127.0.0.1",
+    "db:reset:neon": "echo \"RESETTING NEON DB\" && DATABASE_URL=$(sed -n 's/^DATABASE_URL=\"\\\\(.*\\\\)\"$/\\\\1/p' .env.local.bak | head -n 1) prisma migrate reset --force",
+    "db:which": "node -e \"require('dotenv').config({path:'.env'}); if(!process.env.DATABASE_URL) { console.error('DATABASE_URL missing'); process.exit(1);} const u=new URL(process.env.DATABASE_URL); console.log(u.host+' / '+u.pathname.replace('/',''));\"",
+    "db:which:neon": "DATABASE_URL=$(sed -n 's/^DATABASE_URL=\"\\(.*\\)\"$/\\1/p' .env.local.bak | head -n 1) node -e \"const u=new URL(process.env.DATABASE_URL); console.log(u.host+' / '+u.pathname.replace('/',''));\"",
+    "prisma:regen": "npx prisma format && rm -rf node_modules/.prisma && npx prisma generate --schema=prisma/schema.prisma",
+    "make-admin": "node -r dotenv/config scripts/make-admin.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^5.22.0",
     "@prisma/extension-accelerate": "^3.0.1",
     "bcryptjs": "^3.0.3",
-    "dotenv": "^17.3.1",
     "next": "16.1.6",
     "nodemailer": "^8.0.1",
     "pg": "^8.18.0",
@@ -32,9 +37,14 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "node -r dotenv/config scripts/make-admin.mjs"
   }
 }

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -36,8 +38,24 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
-    return NextResponse.json({ error: "Failed to login" }, { status: 500 });
+
+    const meta =
+      err && typeof err === "object"
+        ? {
+            name: "name" in err ? String((err as { name?: unknown }).name) : undefined,
+            code: "code" in err ? String((err as { code?: unknown }).code) : undefined,
+            message: "message" in err ? String((err as { message?: unknown }).message) : String(err),
+          }
+        : { message: String(err) };
+
+    return NextResponse.json(
+      {
+        error: "Failed to login",
+        ...meta,
+      },
+      { status: 500 }
+    );
   }
 }
