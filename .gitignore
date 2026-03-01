@@ -45,3 +45,5 @@ next-env.d.ts
 # local scripts
 scripts/
 .env*.local
+cookies.txt
+dev.log
