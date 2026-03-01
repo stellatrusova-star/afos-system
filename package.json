@@ -52,9 +52,5 @@
     "vitest": "^4.0.18",
     "wait-on": "^9.0.4"
   },
-  "prisma": {
-    "schema": "prisma/schema.prisma",
-    "seed": "node scripts/seed-test-fixtures.mjs"
-  },
   "dev": "NEXT_DISABLE_TURBOPACK=1 next dev -p 3000"
 }
