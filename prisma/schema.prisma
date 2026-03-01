@@ -43,6 +43,7 @@ model Payment {
   deletedById  String?
   deleteReason String?
 
+  idempotencyKey String? @unique
   @@index([clientId, amount, paidAt])
   @@index([clientId, deletedAt])
   @@index([billingPeriodId])

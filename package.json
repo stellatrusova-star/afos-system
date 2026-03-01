@@ -26,7 +26,8 @@
     "db:seed:dev": "dotenv -e .env -- node scripts/seed-test-fixtures.mjs",
     "db:migrate:test": "dotenv -e .env.test -- prisma migrate dev",
     "db:seed:test": "dotenv -e .env.test -- node scripts/seed-test-fixtures.mjs",
-    "doctor:env": "bash tools/doctor-env.sh"
+    "doctor:env": "bash tools/doctor-env.sh",
+    "db:sql:dev": "bash tools/psql-dev.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",

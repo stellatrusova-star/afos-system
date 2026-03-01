@@ -1,7 +1,8 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireUser } from "@/lib/require-user";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 function logEvent(data: Record<string, unknown>) {
@@ -24,43 +25,10 @@ async function getOrCreatePeriod(year: number, month: number) {
 
 export async function GET(req: Request) {
   try {
-    await requireSession();
-    const { searchParams } = new URL(req.url);
-    const now = new Date();
-    const year = Number(searchParams.get("year") ?? now.getFullYear());
-    const month = Number(searchParams.get("month") ?? now.getMonth() + 1);
-
-    const period = await getOrCreatePeriod(year, month);
-
-    logEvent({ event: "BILLING_GET", route: "/api/billing", result: "ok", year, month, isClosed: period.isClosed });
-    return NextResponse.json({
-      year,
-      month,
-      periodId: period.id,
-      isClosed: period.isClosed,
-      closedAt: period.closedAt,
-      closedById: period.closedById,
-    });
-  } catch (err: any) {
-    logEvent({ event: "BILLING_GET", route: "/api/billing", result: "err", message: String(err?.message || err) });
-    const msg = String(err?.message || err);
-    if (/unauthorized|no session|invalid session|auth/i.test(msg)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.json({ error: "Failed to fetch billing period" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const { userId } = await requireSession();
-
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = await req.json();
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
+    const user = auth.user;
+        const body = await req.json();
     const now = new Date();
     const year = Number(body?.year ?? now.getFullYear());
     const month = Number(body?.month ?? now.getMonth() + 1);
@@ -83,13 +51,13 @@ export async function POST(req: Request) {
       data: {
         isClosed: true,
         closedAt: new Date(),
-        closedById: userId,
+        closedById: user.id,
       },
     });
 
     await prisma.auditLog.create({
       data: {
-        userId,
+        userId: user.id,
         entityType: "BillingPeriod",
         entityId: closed.id,
         action: "CLOSE",

@@ -1,12 +1,18 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/require-user";
+import { Role } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { POST as sendReminders } from "@/app/api/reminders/send/route";
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireUser({ roles: [Role.ADMIN] });
+    if (auth.error) return auth.error;
+    const __AUTH_USER__ = auth.user;
+
     const cookieStore = await cookies();
     const session = cookieStore.get("afos_session");
 
@@ -19,11 +25,11 @@ export async function POST(req: Request) {
       select: { id: true, role: true },
     });
 
-    if (!user) {
+            if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (user.role !== "ADMIN") {
+    if (user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden (ADMIN only)" }, { status: 403 });
     }
 
