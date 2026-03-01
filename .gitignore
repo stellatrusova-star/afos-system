@@ -49,3 +49,5 @@ cookies.txt
 dev.log
 
 !scripts/make-admin.mjs
+
+!scripts/seed-test-fixtures.mjs
