@@ -18,7 +18,8 @@
     "make-admin": "node -r dotenv/config scripts/make-admin.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "pnpm exec prisma migrate reset --force && node scripts/seed-test-fixtures.mjs && concurrently -k -s first -n DEV,TEST \"pnpm run dev\" \"pnpm exec wait-on http://127.0.0.1:3000/api/health && pnpm exec vitest run --environment node tests/integration/closed-period.test.ts\""
+    "test:integration": "pnpm exec prisma migrate reset --force && node scripts/seed-test-fixtures.mjs && concurrently -k -s first -n DEV,TEST \"pnpm run dev\" \"pnpm exec wait-on http://127.0.0.1:3000/api/health && pnpm exec vitest run --environment node tests/integration/closed-period.test.ts\"",
+    "test:integration:prod": "pnpm exec prisma migrate reset --force && node scripts/seed-test-fixtures.mjs && pnpm run build && concurrently -k -s first -n START,TEST \"pnpm run start -p 3000\" \"pnpm exec wait-on http://127.0.0.1:3000/api/health && pnpm exec vitest run --environment node tests/integration/closed-period.test.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
