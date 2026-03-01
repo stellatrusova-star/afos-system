@@ -1,8 +1,9 @@
+import "dotenv/config";
 import { describe, it, expect } from "vitest";
 
 const BASE = process.env.AFOS_BASE_URL ?? "http://127.0.0.1:3000";
-const EMAIL = "admin@example.com";
-const PASSWORD = "admin123";
+const EMAIL = process.env.SEED_ADMIN_EMAIL ?? "stella.trusova@gmail.com";
+const PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "stella.trusova@gmail.com";
 const YEAR = 2026;
 const CLOSED_MONTH = 3;
 const OPEN_MONTH = 4;
@@ -48,7 +49,12 @@ describe("Billing period enforcement (integration)", () => {
   it("rejects payment creation in a closed period (409)", async () => {
     // 1) Login
     const login = await postJson("/api/auth/login", { email: EMAIL, password: PASSWORD });
-    expect(login.res.status).toBe(200);
+    console.log("LOGIN_STATUS:", login.res.status);
+    console.log("LOGIN_SET_COOKIE:", login.res.headers.get("set-cookie"));
+    console.log("LOGIN_TEXT:", login.text);
+
+    console.log("LOGIN_AS:", { EMAIL, PASSWORD: PASSWORD ? "***" : "(missing)", SEED_ADMIN_PASSWORD_PRESENT: !!process.env.SEED_ADMIN_PASSWORD });
+expect(login.res.status).toBe(200);
 
     const cookie = extractCookie(login.res.headers.get("set-cookie"));
 
@@ -80,7 +86,11 @@ describe("Billing period enforcement (integration)", () => {
   it("allows payment creation in an open period (201)", async () => {
     // 1) Login
     const login = await postJson("/api/auth/login", { email: EMAIL, password: PASSWORD });
-    expect(login.res.status).toBe(200);
+    console.log("LOGIN_STATUS:", login.res.status);
+    console.log("LOGIN_SET_COOKIE:", login.res.headers.get("set-cookie"));
+    console.log("LOGIN_TEXT:", login.text);
+
+expect(login.res.status).toBe(200);
 
     const cookie = extractCookie(login.res.headers.get("set-cookie"));
 

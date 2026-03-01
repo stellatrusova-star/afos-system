@@ -16,11 +16,16 @@ export async function POST(req: Request) {
 
     const hashed = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashed,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const userCount = await tx.user.count();
+      const role = userCount === 0 ? "ADMIN" : "ACCOUNTANT";
+      return tx.user.create({
+        data: {
+          email,
+          password: hashed,
+          role,
+        },
+      });
     });
 
     return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });

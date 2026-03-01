@@ -8,15 +8,17 @@ const YEAR = 2026;
 const CLOSED_MONTH = 3;
 const OPEN_MONTH = 4;
 
-const email = process.env.SEED_ADMIN_EMAIL || "admin@example.com";
-const password = process.env.SEED_ADMIN_PASSWORD || "admin123";
+console.log("DATABASE_URL_PRESENT:", !!process.env.DATABASE_URL);
+const email = process.env.SEED_ADMIN_EMAIL || "stella.trusova@gmail.com";
+console.log("SEED_ADMIN_EMAIL:", email);
+const password = process.env.SEED_ADMIN_PASSWORD || "stella.trusova@gmail.com";
 const hash = await bcrypt.hash(password, 10);
 
 // 1) Admin user
 await prisma.user.upsert({
   where: { email },
-  update: { password: hash, role: "ACCOUNTANT" },
-  create: { email, password: hash, role: "ACCOUNTANT" },
+  update: { password: hash, role: "ADMIN" },
+  create: { email, password: hash, role: "ADMIN" },
 });
 
 // 2) Ensure at least one client exists
