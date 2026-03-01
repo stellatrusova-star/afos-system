@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "pnpm exec prisma migrate reset --force --skip-seed && node scripts/seed-test-fixtures.mjs && concurrently -k -s first -n DEV,TEST \"pnpm run dev\" \"pnpm exec wait-on http://127.0.0.1:3000/api/health && pnpm exec vitest run --environment node tests/integration/closed-period.test.ts\"",
-    "test:integration:prod": "pnpm exec prisma migrate reset --force --skip-seed && node scripts/seed-test-fixtures.mjs && pnpm run build && timeout 300 bash -lc \"set -euo pipefail; echo CI_BLOCK_START; setsid pnpm run start -p 3000 >/tmp/server.log 2>&1 & SERVER_PID=$!; echo SERVER_PID=$SERVER_PID; pnpm exec wait-on --timeout 60000 http://127.0.0.1:3000/api/health; pnpm exec vitest run --environment node tests/integration/closed-period.test.ts; TEST_CODE=$?; echo TEST_CODE=$TEST_CODE; kill -- -$SERVER_PID 2>/dev/null || true; sleep 1; kill -9 -- -$SERVER_PID 2>/dev/null || true; echo CI_BLOCK_END; exit $TEST_CODE\""
+    "test:integration:prod": "pnpm exec prisma migrate reset --force --skip-seed && node scripts/seed-test-fixtures.mjs && pnpm run build && timeout 300 bash -lc \"set -euo pipefail; : > /tmp/server.log; echo CI_BLOCK_START; pnpm run start -p 3000 >/tmp/server.log 2>&1 & SERVER_PID=$!; echo SERVER_PID=$SERVER_PID; pnpm exec wait-on --timeout 60000 http://127.0.0.1:3000/api/health; pnpm exec vitest run --environment node tests/integration/closed-period.test.ts; TEST_CODE=$?; echo TEST_CODE=$TEST_CODE; kill $SERVER_PID 2>/dev/null || true; wait $SERVER_PID 2>/dev/null || true; echo ---SERVER_LOG_TAIL---; tail -n 200 /tmp/server.log || true; echo CI_BLOCK_END; exit $TEST_CODE\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
