@@ -60,7 +60,8 @@ export async function GET(req: Request) {
 
     logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "ok", year, month, count: payments.length });
     return NextResponse.json({ year, month, isClosed: period.isClosed, periodId: period.id, payments });
-  } catch (err: unknown) {
+  }
+  catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logEvent({ event: "PAYMENTS_GET", route: "/api/payments", result: "err", message: msg });
 
@@ -72,7 +73,8 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {try {
+export async function POST(req: Request) {
+  try {
     const { userId } = await requireSession();
     const body = await req.json();
     const clientId = body?.clientId;
@@ -182,7 +184,8 @@ export async function POST(req: Request) {try {
 
     logEvent({ event: "PAYMENT_CREATE", route: "/api/payments", result: "ok", paymentId: payment.id, clientId, year, month });
     return NextResponse.json({ ok: true, payment }, { status: 201 });
-  } catch (err: unknown) {
+  }
+  catch (err: unknown) {
     const code =
       err && typeof err === "object" && "code" in err
         ? (err as { code?: unknown }).code
@@ -201,7 +204,8 @@ export async function POST(req: Request) {try {
   }
 }
 
-export async function DELETE(req: Request) {try {
+export async function DELETE(req: Request) {
+  try {
     const { userId } = await requireSession();
     const body = await req.json();
     const paymentId = body?.paymentId;
@@ -301,7 +305,8 @@ export async function DELETE(req: Request) {try {
 
     logEvent({ event: "PAYMENT_DELETE", route: "/api/payments", result: "ok", paymentId, year, month, remaining });
     return NextResponse.json({ ok: true, remaining });
-  } catch (err: unknown) {
+  }
+  catch (err: unknown) {
     const code =
       err && typeof err === "object" && "code" in err
         ? (err as { code?: unknown }).code
