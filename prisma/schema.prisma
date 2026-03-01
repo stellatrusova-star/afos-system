@@ -2,6 +2,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
+enum Role {
+  ACCOUNTANT
+  ADMIN
+  MANAGER
+  STAFF
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -81,9 +89,10 @@ model AuditLog {
 }
 
 model User {
+
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
-  role      String   @default("ACCOUNTANT")
+  role      Role     @default(ACCOUNTANT)
   createdAt DateTime @default(now())
 }
