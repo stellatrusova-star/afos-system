@@ -43,7 +43,9 @@ next-env.d.ts
 /app/generated/prisma
 
 # local scripts
-scripts/
+# scripts (keep tracked scripts, ignore local artifacts only)
+scripts/.local/
+
 .env*.local
 cookies.txt
 dev.log
@@ -58,3 +60,8 @@ dev.log
 
 # env files
 .env*
+
+# allow tracked scripts needed for dev/ci
+!scripts/test-integration.sh
+!scripts/seed-test-fixtures.mjs
+!scripts/seed-test-admin.mjs
