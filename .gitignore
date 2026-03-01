@@ -65,3 +65,6 @@ dev.log
 !scripts/test-integration.sh
 !scripts/seed-test-fixtures.mjs
 !scripts/seed-test-admin.mjs
+
+# allow env templates
+!.env*.example
