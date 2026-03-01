@@ -15,4 +15,4 @@ pnpm exec dotenv -e .env.test -- bash -lc "node scripts/seed-test-fixtures.mjs &
 # Start server + run tests
 pnpm exec concurrently -k -s first -n DEV,TEST \
   "pnpm run dev:test" \
-  "pnpm exec wait-on http://127.0.0.1:${PORT}/api/health && pnpm exec dotenv -e .env.test -- vitest run --no-file-parallelism --maxWorkers=1 --environment node tests/integration/closed-period.test.ts tests/integration/first-admin-bootstrap.test.ts"
+  "pnpm exec wait-on http://127.0.0.1:${PORT}/api/health && pnpm exec dotenv -e .env.test -- vitest run --no-file-parallelism --maxWorkers=1 --environment node tests/integration/closed-period.test.ts tests/integration/first-admin-bootstrap.test.ts tests/integration/clients-create.test.ts"
