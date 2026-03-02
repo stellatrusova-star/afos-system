@@ -43,3 +43,61 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to fetch billing period", detail: msg }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  const auth = await requireUser({ roles: [Role.ADMIN] });
+  if (auth.error) return auth.error;
+
+  try {
+    const body = await req.json();
+    const year = Number(body?.year);
+    const month = Number(body?.month);
+
+    if (!Number.isInteger(year) || year < 2000 || year > 3000) {
+      return NextResponse.json({ error: "Invalid year" }, { status: 400 });
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return NextResponse.json({ error: "Invalid month" }, { status: 400 });
+    }
+
+    const period = await getOrCreatePeriod(year, month);
+
+    if (period.isClosed) {
+      return NextResponse.json(
+        { ok: true, periodId: period.id, year, month, isClosed: true },
+        { status: 200 }
+      );
+    }
+
+    const updated = await prisma.billingPeriod.update({
+      where: { id: period.id },
+      data: { isClosed: true, closedAt: new Date(), closedById: auth.user.id },
+      select: { id: true, year: true, month: true, isClosed: true, closedAt: true, closedById: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entityType: "BillingPeriod",
+        entityId: updated.id,
+        action: "CLOSE",
+        meta: { actorUserId: auth.user.id, year: updated.year, month: updated.month },
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        periodId: updated.id,
+        year: updated.year,
+        month: updated.month,
+        isClosed: updated.isClosed,
+        closedAt: updated.closedAt,
+        closedById: updated.closedById,
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "Failed to close billing period", detail: msg }, { status: 500 });
+  }
+}

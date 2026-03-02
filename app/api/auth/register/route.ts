@@ -11,6 +11,8 @@ export async function POST(req: Request) {
     const password = body?.password;
 
     if (!email || !password) {
+
+
       return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
     }
 
@@ -30,7 +32,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });
   } catch (err: unknown) {
-    console.error(err);
 
     const meta =
       err && typeof err === "object"
@@ -40,6 +41,15 @@ export async function POST(req: Request) {
             message: "message" in err ? String((err as { message?: unknown }).message) : String(err),
           }
         : { message: String(err) };
+
+      const code = meta.code;
+
+      if (code === "P2002") {
+        return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+      }
+
+      // Only log unexpected errors
+      console.error(err);
 
     return NextResponse.json(
       {

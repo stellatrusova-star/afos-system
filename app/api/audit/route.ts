@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/require-user";
 import { Role } from "@prisma/client";
 
-export async function GET(_req: Request) {
+export async function GET() {
   const auth = await requireUser({ roles: [Role.ADMIN] });
   if (auth.error) return auth.error;
 

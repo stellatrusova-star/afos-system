@@ -11,7 +11,6 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser({ roles: [Role.ADMIN] });
     if (auth.error) return auth.error;
-    const __AUTH_USER__ = auth.user;
 
     const cookieStore = await cookies();
     const session = cookieStore.get("afos_session");
