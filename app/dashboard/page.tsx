@@ -14,9 +14,9 @@ export default function DashboardPage() {
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
 
   const years = useMemo(() => {
-    const y = now.getFullYear();
-    return [y - 1, y, y + 1];
-  }, [now]);
+  const y = new Date().getFullYear();
+  return [y - 1, y, y + 1];
+}, []);
 
   async function sendRemindersSelectedMonth() {
     const confirmed = window.confirm(`Send reminders for ${monthLabel(month)} ${year}?`);

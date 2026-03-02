@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -34,9 +35,9 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
 
   const years = useMemo(() => {
-    const y = now.getFullYear();
-    return [y - 1, y, y + 1];
-  }, [now]);
+  const y = new Date().getFullYear();
+  return [y - 1, y, y + 1];
+}, []);
 
   async function loadClients(y: number, m: number) {
       setLoading(true);

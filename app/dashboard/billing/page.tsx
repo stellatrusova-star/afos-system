@@ -28,9 +28,9 @@ export default function BillingPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const years = useMemo(() => {
-    const y = now.getFullYear();
-    return [y - 1, y, y + 1];
-  }, [now]);
+  const y = new Date().getFullYear();
+  return [y - 1, y, y + 1];
+}, []);
 
   async function load(y: number, m: number) {
     setErr(null);
